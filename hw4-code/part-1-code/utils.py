@@ -38,13 +38,64 @@ def custom_transform(example):
     ################################
     ##### YOUR CODE BEGINGS HERE ###
 
-    # Design and implement the transformation as mentioned in pdf
-    # You are free to implement any transformation but the comments at the top roughly describe
-    # how you could implement two of them --- synonym replacement and typos.
+    # Transformation: insert a short, neutral discourse phrase into the review.
+    # Steps:
+    # 1. Tokenize the original text.
+    # 2. Sample a neutral phrase such as "to be honest" or "in my opinion".
+    # 3. Insert the phrase either:
+    #    - at the beginning of the review, OR
+    #    - after a random comma, OR
+    #    - at a random token boundary (if no comma is chosen/available).
+    # 4. Detokenize back to a string and update example["text"].
 
-    # You should update example["text"] using your transformation
+    text = example.get("text", "")
 
-    raise NotImplementedError
+    # If text is empty or very short, just return as is
+    if not text:
+        return example
+
+    # Neutral, label-preserving discourse phrases
+    neutral_phrases = [
+        "to be honest",
+        "in my opinion",
+        "honestly",
+        "I think",
+        "for what it's worth",
+        "by the way",
+        "to be fair",
+        "as a side note",
+    ]
+
+    # Tokenize the original review
+    tokens = word_tokenize(text)
+
+    # If tokenization fails or yields nothing, leave unchanged
+    if len(tokens) == 0:
+        return example
+
+    # Choose a neutral phrase and tokenize it
+    phrase = random.choice(neutral_phrases)
+    phrase_tokens = word_tokenize(phrase)
+
+    # Decide insertion position:
+    # 50% chance to insert after a comma if any commas exist,
+    # otherwise insert at a random token boundary (including start/end).
+    comma_indices = [i for i, tok in enumerate(tokens) if tok == ","]
+    if comma_indices and random.random() < 0.5:
+        # Insert right after a random comma
+        insert_pos = random.choice(comma_indices) + 1
+    else:
+        # Insert at a random boundary (0 .. len(tokens))
+        insert_pos = random.randint(0, len(tokens))
+
+    # Insert phrase tokens plus a comma after them to keep it natural: "Honestly, ..."
+    new_tokens = tokens[:insert_pos] + phrase_tokens + [","] + tokens[insert_pos:]
+
+    # Detokenize back into a single string
+    detok = TreebankWordDetokenizer()
+    new_text = detok.detokenize(new_tokens)
+
+    example["text"] = new_text
 
     ##### YOUR CODE ENDS HERE ######
 

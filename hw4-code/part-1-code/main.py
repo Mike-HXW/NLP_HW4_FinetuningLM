@@ -39,7 +39,7 @@ def do_train(args, model, train_dataloader, save_dir="./out"):
 
     ################################
     ##### YOUR CODE BEGINGS HERE ###
-    
+
     for epoch in range(num_epochs):
         # Ensure model is in training mode each epoch
         model.train()
@@ -114,7 +114,33 @@ def create_augmented_dataloader(args, dataset):
     # dataloader will be for the original training split augmented with 5k random transformed examples from the training set.
     # You may find it helpful to see how the dataloader was created at other place in this code.
 
-    raise NotImplementedError
+    # Original HF train split (with "text" and "label")
+    train_raw = dataset["train"]
+
+    # 1. Sample 5,000 random training examples to transform
+    aug_raw_subset = train_raw.shuffle(seed=42).select(range(5000))
+
+    # 2. Apply our custom transformation (neutral phrase insertion) to this subset
+    aug_transformed_raw = aug_raw_subset.map(custom_transform, load_from_cache_file=False)
+
+    # 3. Tokenize the full original train split and the transformed subset
+    tokenized_train = train_raw.map(tokenize_function, batched=True)
+    tokenized_aug = aug_transformed_raw.map(tokenize_function, batched=True, load_from_cache_file=False)
+
+    # 4. Prepare for model: remove "text", rename "label" -> "labels", set format to torch
+    tokenized_train = tokenized_train.remove_columns(["text"])
+    tokenized_train = tokenized_train.rename_column("label", "labels")
+    tokenized_train.set_format("torch")
+
+    tokenized_aug = tokenized_aug.remove_columns(["text"])
+    tokenized_aug = tokenized_aug.rename_column("label", "labels")
+    tokenized_aug.set_format("torch")
+
+    # 5. Concatenate original and transformed training datasets
+    augmented_dataset = tokenized_train.concatenate(tokenized_aug)
+
+    # 6. Create dataloader
+    train_dataloader = DataLoader(augmented_dataset, shuffle=True, batch_size=args.batch_size)
 
     ##### YOUR CODE ENDS HERE ######
 
