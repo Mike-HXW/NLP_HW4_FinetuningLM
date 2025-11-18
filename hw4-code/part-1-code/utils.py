@@ -49,52 +49,83 @@ def custom_transform(example):
     # 4. Detokenize back to a string and update example["text"].
 
     text = example.get("text", "")
-
-    # If text is empty or very short, just return as is
     if not text:
         return example
 
-    # Neutral, label-preserving discourse phrases
-    neutral_phrases = [
-        "to be honest",
-        "in my opinion",
-        "honestly",
-        "I think",
-        "for what it's worth",
-        "by the way",
-        "to be fair",
-        "as a side note",
-    ]
-
-    # Tokenize the original review
     tokens = word_tokenize(text)
-
-    # If tokenization fails or yields nothing, leave unchanged
     if len(tokens) == 0:
         return example
 
-    # Choose a neutral phrase and tokenize it
-    phrase = random.choice(neutral_phrases)
-    phrase_tokens = word_tokenize(phrase)
+    qwerty_neighbors = {
+        "q": "w",
+        "w": "qe",
+        "e": "wr",
+        "r": "et",
+        "t": "ry",
+        "y": "tu",
+        "u": "yi",
+        "i": "uo",
+        "o": "ip",
+        "p": "o",
+        "a": "s",
+        "s": "ad",
+        "d": "sf",
+        "f": "dg",
+        "g": "fh",
+        "h": "gj",
+        "j": "hk",
+        "k": "jl",
+        "l": "k",
+        "z": "x",
+        "x": "zc",
+        "c": "xv",
+        "v": "cb",
+        "b": "vn",
+        "n": "bm",
+        "m": "n",
+    }
 
-    # Decide insertion position:
-    # 50% chance to insert after a comma if any commas exist,
-    # otherwise insert at a random token boundary (including start/end).
-    comma_indices = [i for i, tok in enumerate(tokens) if tok == ","]
-    if comma_indices and random.random() < 0.5:
-        # Insert right after a random comma
-        insert_pos = random.choice(comma_indices) + 1
-    else:
-        # Insert at a random boundary (0 .. len(tokens))
-        insert_pos = random.randint(0, len(tokens))
-
-    # Insert phrase tokens plus a comma after them to keep it natural: "Honestly, ..."
-    new_tokens = tokens[:insert_pos] + phrase_tokens + [","] + tokens[insert_pos:]
-
-    # Detokenize back into a single string
     detok = TreebankWordDetokenizer()
-    new_text = detok.detokenize(new_tokens)
+    new_tokens = []
 
+    for tok in tokens:
+        if tok.isalpha():
+            lowered = tok.lower()
+
+            if random.random() < 0.05:
+                continue  
+
+            if random.random() < 0.20:
+                synsets = wordnet.synsets(lowered)
+                lemmas = []
+                for s in synsets:
+                    for l in s.lemmas():
+                        lemma_name = l.name().replace("_", " ")
+                        if lemma_name.lower() != lowered and lemma_name.isalpha():
+                            lemmas.append(lemma_name)
+                if lemmas:
+                    replacement = random.choice(lemmas)
+                    if tok[0].isupper():
+                        replacement = replacement.capitalize()
+                    new_tokens.append(replacement)
+                    continue  
+
+            if random.random() < 0.30 and len(lowered) > 2:
+                chars = list(lowered)
+                idx = random.randint(1, len(chars) - 2)
+                ch = chars[idx]
+                if ch in qwerty_neighbors:
+                    neighbors = qwerty_neighbors[ch]
+                    chars[idx] = random.choice(neighbors)
+                    corrupted = "".join(chars)
+                    if tok[0].isupper():
+                        corrupted = corrupted.capitalize()
+                    new_tokens.append(corrupted)
+                    continue
+
+        new_tokens.append(tok)
+
+    new_text = detok.detokenize(new_tokens)
     example["text"] = new_text
 
     ##### YOUR CODE ENDS HERE ######
