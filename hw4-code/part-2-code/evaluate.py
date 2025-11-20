@@ -12,5 +12,6 @@ parser.add_argument("-dr", "--development_records", dest = "dev_records",
     required = True, help = "path to the ground-truth development database records")
 
 args = parser.parse_args()
-_, _, record_f1, _ = compute_metrics(args.dev_sql, args.pred_sql, args.dev_records, args.pred_records)
+_, record_em, record_f1, _ = compute_metrics(args.dev_sql, args.pred_sql, args.dev_records, args.pred_records)
 print("Record F1: ", record_f1)
+print("Record EM: ", record_em)
